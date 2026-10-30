@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SanarEnf Studio</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+  <div id="root"></div>
+
+  <!-- React e ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone para interpretar JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useMemo, useEffect } = React;
+
+    const DATABASE = [
+      {
+        id: 'noradrenalina',
+        nome: 'Noradrenalina (Hemitartarato)',
+        nomesComerciais: 'Levophed, Hyponor',
+        tipo: 'medicamento',
+        categoria: 'Vasoativo / Inotrópico',
+        isMav: true,
+        classe: 'Agonista Alfa e Beta-1 Adrenérgico',
+        mecanismo: 'Vasoconstrição periférica potente (efeito alfa-1) e modesto inotropismo cardíaco (beta-1), aumentando a resistência vascular sistêmica e a pressão arterial.',
+        indicacoes: 'Choque séptico, choque cardiogênico, hipotensão grave refratária à ressuscitação volêmica.',
+        viasPosologia: 'Via Endovenosa Exclusiva em Infusão Contínua (Bomba de Infusão).',
+        diluicaoBoasPraticas: 'Diluir preferencialmente em Soro Glicosado 5% (SG 5%).',
+        cuidadosEnfermagem: [
+          'Administrar EXCLUSIVAMENTE em Acesso Venoso Central (PICC ou CVC).',
+          'Monitorar continuamente Pressão Arterial a cada 5 minutos durante titulação.',
+          'Inspecionar sítio de inserção para extravasamento.'
+        ]
+      },
+      {
+        id: 'dobutamina',
+        nome: 'Dobutamina',
+        nomesComerciais: 'Dobutrex',
+        tipo: 'medicamento',
+        categoria: 'Vasoativo / Inotrópico',
+        isMav: true,
+        classe: 'Inotrópico Simpatomimético (Agonista Beta-1)',
+        mecanismo: 'Aumenta a contratilidade miocárdica e o débito cardíaco.',
+        indicacoes: 'Choque cardiogênico, insuficiência cardíaca descompensada.',
+        viasPosologia: 'EV contínua por Bomba de Infusão (BIC).',
+        diluicaoBoasPraticas: 'Compatível com SG5% e SF0,9%.',
+        cuidadosEnfermagem: [
+          'Monitorar frequência cardíaca, traçado de ECG contínuo e pressão arterial.',
+          'Avaliar sinais de melhora de perfusão e débito urinário.'
+        ]
+      },
+      {
+        id: 'vancomicina',
+        nome: 'Vancomicina',
+        nomesComerciais: 'Vancocin',
+        tipo: 'medicamento',
+        categoria: 'Antibiótico',
+        isMav: true,
+        classe: 'Glicopeptídeo Antibacteriano',
+        mecanismo: 'Inibe a síntese da parede celular bacteriana.',
+        indicacoes: 'Infecções graves por Gram-positivos resistentes (MRSA), endocardite.',
+        viasPosologia: 'EV em infusão lenta (mínimo de 60 minutos por 1000mg).',
+        diluicaoBoasPraticas: 'Diluir cada 500mg em pelo menos 100ml de SF0,9% ou SG5%.',
+        cuidadosEnfermagem: [
+          'Prevenir Síndrome do Homem Vermelho realizando infusão lenta.',
+          'Monitorar função renal (ureia e creatinina) diariamente.'
+        ]
+      },
+      {
+        id: 'sne-dobhoff',
+        nome: 'Sonda Nasoentérica (SNE) / Dobbhoff',
+        nomesComerciais: 'Sonda Nutrisoft, Entral',
+        tipo: 'dispositivo',
+        categoria: 'Sondas e Cateteres',
+        isMav: false,
+        classe: 'Dispositivo Enteral com Mandril e Peso Guia',
+        mecanismo: 'Tubo de poliuretano com peso distal para transposição pilórica.',
+        indicacoes: 'Nutrição enteral prolongada em pacientes com disfagia.',
+        viasPosologia: 'Calibres comuns: 8 Fr, 10 Fr, 12 Fr.',
+        diluicaoBoasPraticas: 'Medição correta: Nariz -> Lóbulo da Orelha -> Apêndice Xifóide + 20-30cm.',
+        cuidadosEnfermagem: [
+          'NUNCA administrar dieta ou medicação sem confirmação radiológica prévia.',
+          'Lavar a sonda com 20-30ml de água morna antes e depois de cada dieta/medicação.'
+        ]
+      }
+    ];
+
+    function App() {
+      const [user, setUser] = useState(() => {
+        try {
+          const saved = localStorage.getItem('sanarenf_user');
+          return saved ? JSON.parse(saved) : null;
+        } catch { return null; }
+      });
+
+      const [loginEmail, setLoginEmail] = useState('');
+      const [loginPassword, setLoginPassword] = useState('');
+      const [activeTab, setActiveTab] = useState('bulario');
+      const [searchTerm, setSearchTerm] = useState('');
+      const [selectedFilter, setSelectedFilter] = useState('todos');
+      const [selectedItem, setSelectedItem] = useState(null);
+
+      const [notes, setNotes] = useState(() => {
+        try {
+          const saved = localStorage.getItem('sanarenf_notes');
+          return saved ? JSON.parse(saved) : [
+            {
+              id: '1',
+              title: 'Evolução de Enfermagem - Leito 302',
+              content: 'Paciente estável, consciente, orientado. Sinais vitais dentro da normalidade.',
+              tag: 'Evolução',
+              date: '2026-10-30'
+            }
+          ];
+        } catch { return []; }
+      });
+
+      const [noteTitle, setNoteTitle] = useState('');
+      const [noteContent, setNoteContent] = useState('');
+      const [noteTag, setNoteTag] = useState('Plantão');
+      const [editingNoteId, setEditingNoteId] = useState(null);
+
+      useEffect(() => {
+        localStorage.setItem('sanarenf_notes', JSON.stringify(notes));
+      }, [notes]);
+
+      useEffect(() => {
+        if (user) {
+          localStorage.setItem('sanarenf_user', JSON.stringify(user));
+        } else {
+          localStorage.removeItem('sanarenf_user');
+        }
+      }, [user]);
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        if (!loginEmail) return;
+        setUser({
+          name: loginEmail.split('@')[0].toUpperCase(),
+          email: loginEmail,
+          avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80'
+        });
+      };
+
+      const handleDemoLogin = () => {
+        setUser({
+          name: 'ENFERMEIRO(A) DEMO',
+          email: 'demo@sanar.com',
+          avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80'
+        });
+      };
+
+      const handleLogout = () => setUser(null);
+
+      const handleSaveNote = (e) => {
+        e.preventDefault();
+        if (!noteTitle.trim() || !noteContent.trim()) return;
+
+        if (editingNoteId) {
+          setNotes(notes.map(n => n.id === editingNoteId ? {
+            ...n, title: noteTitle, content: noteContent, tag: noteTag
+          } : n));
+          setEditingNoteId(null);
+        } else {
+          setNotes([{
+            id: Date.now().toString(),
+            title: noteTitle,
+            content: noteContent,
+            tag: noteTag,
+            date: new Date().toISOString().split('T')[0]
+          }, ...notes]);
+        }
+        setNoteTitle('');
+        setNoteContent('');
+      };
+
+      const handleEditNote = (note) => {
+        setEditingNoteId(note.id);
+        setNoteTitle(note.title);
+        setNoteContent(note.content);
+        setNoteTag(note.tag);
+      };
+
+      const handleDeleteNote = (id) => {
+        setNotes(notes.filter(n => n.id !== id));
+      };
+
+      const filteredData = useMemo(() => {
+        return DATABASE.filter(item => {
+          const matchSearch = item.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              item.indicacoes.toLowerCase().includes(searchTerm.toLowerCase());
+          if (selectedFilter === 'todos') return matchSearch;
+          if (selectedFilter === 'mav') return matchSearch && item.isMav;
+          if (selectedFilter === 'medicamentos') return matchSearch && item.tipo === 'medicamento';
+          if (selectedFilter === 'dispositivos') return matchSearch && item.tipo === 'dispositivo';
+          return matchSearch;
+        });
+      }, [searchTerm, selectedFilter]);
+
+      if (!user) {
+        return (
+          <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-md w-full shadow-2xl space-y-6">
+              <div className="text-center space-y-2">
+                <div className="inline-flex items-center justify-center bg-emerald-500 text-slate-950 p-3 rounded-2xl mb-2">
+                  <i data-lucide="activity" className="w-8 h-8"></i>
+                </div>
+                <h1 className="text-2xl font-bold tracking-tight text-white">SanarEnf Studio</h1>
+                <p className="text-xs text-slate-400">Portal de Apoio Clínico & Gestão Prática em Enfermagem</p>
+              </div>
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">E-mail Profissional</label>
+                  <input 
+                    type="email" 
+                    required
+                    placeholder="enfermeiro@sanar.com" 
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-emerald-500 text-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Senha</label>
+                  <input 
+                    type="password" 
+                    required
+                    placeholder="••••••••" 
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-emerald-500 text-slate-200"
+                  />
+                </div>
+                <button type="submit" className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition text-sm cursor-pointer shadow-lg shadow-emerald-500/10">
+                  Entrar na Plataforma
+                </button>
+              </form>
+
+              <button onClick={handleDemoLogin} className="w-full py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-200 font-medium rounded-xl transition text-sm cursor-pointer">
+                Entrar com Modo Demonstração
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+          <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="bg-emerald-500 text-slate-950 p-2 rounded-xl font-bold flex items-center gap-2">
+                  <i data-lucide="activity" className="w-5 h-5"></i>
+                  <span className="tracking-tight text-lg">SanarEnf Studio</span>
+                </div>
+              </div>
+              
+              <nav className="flex space-x-1">
+                <button 
+                  onClick={() => setActiveTab('bulario')} 
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 cursor-pointer ${activeTab === 'bulario' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-slate-400 hover:bg-slate-800'}`}
+                >
+                  <i data-lucide="pill" className="w-4 h-4"></i>
+                  Bulário
+                </button>
+                <button 
+                  onClick={() => setActiveTab('anotacoes')} 
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2 cursor-pointer ${activeTab === 'anotacoes' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-slate-400 hover:bg-slate-800'}`}
+                >
+                  <i data-lucide="file-text" className="w-4 h-4"></i>
+                  Anotações
+                </button>
+              </nav>
+
+              <div className="flex items-center gap-3">
+                <span className="hidden sm:inline text-xs font-semibold text-slate-300">{user.name}</span>
+                <button onClick={handleLogout} title="Sair" className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition cursor-pointer">
+                  <i data-lucide="log-out" className="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl w-full mx-auto px-4 py-8 flex-1">
+            {activeTab === 'bulario' && (
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900 p-4 rounded-2xl border border-slate-800">
+                  <div className="relative w-full md:w-96">
+                    <i data-lucide="search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                    <input 
+                      type="text" 
+                      placeholder="Buscar medicação, sonda ou indicação..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-emerald-500 text-slate-200"
+                    />
+                  </div>
+                  <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                    {[
+                      { id: 'todos', label: 'Todos' },
+                      { id: 'mav', label: '🔴 MAVs' },
+                      { id: 'medicamentos', label: '💊 Medicamentos' },
+                      { id: 'dispositivos', label: '🩺 Sondas & Cateteres' }
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setSelectedFilter(f.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap border cursor-pointer transition ${selectedFilter === f.id ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'border-slate-800 bg-slate-950 text-slate-400 hover:bg-slate-800'}`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredData.map(item => (
+                    <div 
+                      key={item.id}
+                      onClick={() => setSelectedItem(item)}
+                      className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-5 cursor-pointer transition-all flex flex-col justify-between group"
+                    >
+                      <div>
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-xs px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 font-medium">{item.categoria}</span>
+                          {item.isMav && <span className="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 font-bold">MAV</span>}
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">{item.nome}</h3>
+                        <p className="text-xs text-slate-400 mb-4">{item.nomesComerciais}</p>
+                        <p className="text-xs text-slate-300 line-clamp-2 bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50">
+                          <strong>Indicação:</strong> {item.indicacoes}
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-emerald-400 font-medium pt-3 mt-4 border-t border-slate-800/60">
+                        <span>Ver Ficha Completa</span>
+                        <i data-lucide="chevron-right" className="w-4 h-4"></i>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'anotacoes' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 h-fit">
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="plus" className="w-5 h-5 text-emerald-400"></i>
+                    {editingNoteId ? 'Editar Anotação' : 'Nova Anotação'}
+                  </h2>
+                  <form onSubmit={handleSaveNote} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Título / Paciente</label>
+                      <input 
+                        type="text" 
+                        placeholder="Ex: Evolução Leito 104"
+                        value={noteTitle}
+                        onChange={(e) => setNoteTitle(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Tag</label>
+                      <select 
+                        value={noteTag}
+                        onChange={(e) => setNoteTag(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="Plantão">Plantão</option>
+                        <option value="Evolução">Evolução</option>
+                        <option value="Estudo">Estudo</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-400 mb-1">Conteúdo</label>
+                      <textarea 
+                        rows={5}
+                        placeholder="Detalhes..."
+                        value={noteContent}
+                        onChange={(e) => setNoteContent(e.target.value)}
+                        className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-200 focus:outline-none focus:border-emerald-500 resize-none"
+                      />
+                    </div>
+                    <button type="submit" className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs cursor-pointer">
+                      Salvar Registro
+                    </button>
+                  </form>
+                </div>
+
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {notes.map(n => (
+                      <div key={n.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 flex flex-col justify-between">
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-emerald-400 font-semibold">{n.tag}</span>
+                            <span className="text-[10px] text-slate-500">{n.date}</span>
+                          </div>
+                          <h3 className="font-bold text-slate-100 text-sm mb-1">{n.title}</h3>
+                          <p className="text-xs text-slate-300 leading-relaxed">{n.content}</p>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-3 border-t border-slate-800/60">
+                          <button onClick={() => handleEditNote(n)} className="p-1.5 text-slate-400 hover:text-emerald-400 cursor-pointer"><i data-lucide="edit-3" className="w-4 h-4"></i></button>
+                          <button onClick={() => handleDeleteNote(n.id)} className="p-1.5 text-slate-400 hover:text-red-400 cursor-pointer"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedItem && (
+              <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+                  <button onClick={() => setSelectedItem(null)} className="absolute top-5 right-5 text-slate-400 hover:text-white bg-slate-800 p-2 rounded-xl cursor-pointer">✕</button>
+                  <h2 className="text-xl font-bold text-white">{selectedItem.nome}</h2>
+                  <p className="text-xs text-slate-400">Nomes comerciais: {selectedItem.nomesComerciais}</p>
+                  
+                  <div className="space-y-3 text-xs">
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <strong className="text-emerald-400 block mb-1">Mecanismo:</strong>
+                      <span className="text-slate-300">{selectedItem.mecanismo}</span>
+                    </div>
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <strong className="text-emerald-400 block mb-1">Indicação:</strong>
+                      <span className="text-slate-300">{selectedItem.indicacoes}</span>
+                    </div>
+                    <div className="bg-emerald-950/20 p-4 rounded-xl border border-emerald-500/30">
+                      <h4 className="text-emerald-400 font-bold mb-2">Cuidados de Enfermagem</h4>
+                      <ul className="list-disc list-inside space-y-1 text-slate-200">
+                        {selectedItem.cuidadosEnfermagem.map((c, i) => <li key={i}>{c}</li>)}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+    // Atualiza os ícones do Lucide após renderizar
+    setTimeout(() => { lucide.createIcons(); }, 100);
+  </script>
+</body>
+</html>
